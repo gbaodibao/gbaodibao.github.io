@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <!-- Thêm viewport chuẩn di động, khóa zoom trình duyệt để nhường cử chỉ cho 3D -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mô Hình Sinh Học AR - Dịch Mã</title>
+
+  <!-- A-Frame & MindAR -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: none; /* Khóa cuộn trang web để nhận cảm ứng mượt mà */
+    }
+
+    /* Màn hình chờ */
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #111827;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      z-index: 99999;
+      transition: opacity 0.4s ease;
+    }
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(255,255,255,0.15);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Thanh điều khiển nổi hiện đại (Glassmorphism) */
+    .ar-ui-container {
+      position: fixed;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      z-index: 1000;
+      pointer-events: none; /* Giữ gesture xuyên qua màn hình */
+    }
+
+    .hint-chip {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #e2e8f0;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:active {
+      background: rgba(59, 130, 246, 0.9);
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <h3 style="margin: 0 0 8px 0;">Đang khởi động Camera AR</h3>
+    <p style="margin: 0; font-size: 14px; color: #94a3b8;">Vui lòng cấp quyền camera và hướng máy vào hình ảnh...</p>
+  </div>
+
+  <!-- UI Buttons -->
+  <div class="ar-ui-container">
+    <div class="hint-chip">
+      Mô hình ribosome <br> Nhóm 3 Lớp 12A8
+    </div>
+    <div class="btn-group">
+      <button class="btn" onclick="resetTransforms()">
+        ↺ Đặt lại mô hình
+      </button>
+    </div>
+  </div>
+
+  <!-- 
+    Cấu hình khử rung:
+    - filterMinCF: 0.0001 (giảm rung khi tay cầm đứng yên)
+    - filterBeta: 0.001 (tăng độ mượt khi di chuyển camera nhẹ)
+  -->
+  <a-scene 
+    mindar-image="imageTargetSrc: targets1.mind; autoStart: true; filterMinCF: 0.0001; filterBeta: 0.001; warmupTolerance: 5; missTolerance: 5;" 
+    color-space="sRGB" 
+    renderer="colorManagement: true, physicallyCorrectLights: true, antialias: true" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false">
+    
+    <a-assets>
+      <a-asset-item id="bioModel" src="ribosome.glb"></a-asset-item>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity id="targetMarker" mindar-image-target="targetIndex: 0">
+      
+      <!-- Cụm bao bọc (wrapper) để nhận điều khiển Scale và Rotation độc lập -->
+      <a-entity id="modelWrapper" position="0 0 0" rotation="0 0 0" scale="0.2 0.2 0.2">
+        <a-gltf-model 
+          id="model3D" 
+          src="#bioModel" 
+          position="0 0 0" 
+          rotation="0 0 0">
+        </a-gltf-model>
+      </a-entity>
+
+      <!-- Ánh sáng -->
+      <a-light type="directional" intensity="1.8" position="2 3 2"></a-light>
+      <a-light type="ambient" intensity="0.8"></a-light>
+    </a-entity>
+  </a-scene>
+
+  <!-- Script xử lý Touch Gesture (Mobile) + Mouse Wheel (PC) -->
+  <script>
+    const sceneEl = document.querySelector('a-scene');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const modelWrapper = document.getElementById('modelWrapper');
+
+    // Thông số ban đầu
+    const INITIAL_SCALE = 0.2; // Bạn chỉnh tỉ lệ gốc phù hợp với file model của bạn ở đây
+    let currentScale = INITIAL_SCALE;
+    let currentRotY = 0;
+    let currentRotX = 0;
+
+    // Giới hạn scale để tránh mô hình biến mất hoặc to tràn màn hình
+    const MIN_SCALE = INITIAL_SCALE * 0.2;
+    const MAX_SCALE = INITIAL_SCALE * 5.0;
+
+    // Tắt màn hình loading khi camera đã sẵn sàng
+    sceneEl.addEventListener('arReady', () => {
+      loadingOverlay.style.opacity = '0';
+      setTimeout(() => { loadingOverlay.style.display = 'none'; }, 400);
+    });
+
+    // 1. Phóng to / Thu nhỏ bằng con lăn chuột (Dành cho PC)
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      applyZoom(zoomFactor);
+    }, { passive: false });
+
+    // 2. Kéo xoay bằng chuột trên PC
+    let isMouseDown = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    window.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.btn-group')) return;
+      isMouseDown = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      const deltaX = e.clientX - lastMouseX;
+      const deltaY = e.clientY - lastMouseY;
+      
+      currentRotY += deltaX * 0.5;
+      currentRotX += deltaY * 0.3;
+      updateRotation();
+
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+    // 3. Cảm ứng trên điện thoại (1 ngón = xoay, 2 ngón = pinch zoom)
+    let initialTouchDistance = null;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.btn-group')) return;
+
+      if (e.touches.length === 1) {
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        // Bắt đầu chụm 2 ngón
+        initialTouchDistance = getTouchDistance(e.touches);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.target.closest('.btn-group')) return;
+
+      if (e.touches.length === 1 && initialTouchDistance === null) {
+        // Vuốt 1 ngón xoay mô hình
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - lastTouchX;
+        const deltaY = touch.clientY - lastTouchY;
+
+        currentRotY += deltaX * 0.6;
+        currentRotX += deltaY * 0.3;
+        updateRotation();
+
+        lastTouchX = touch.clientX;
+        lastTouchY = touch.clientY;
+      } 
+      else if (e.touches.length === 2) {
+        // Pinch zoom 2 ngón
+        const newDistance = getTouchDistance(e.touches);
+        if (initialTouchDistance) {
+          const ratio = newDistance / initialTouchDistance;
+          applyZoom(ratio);
+          initialTouchDistance = newDistance;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        initialTouchDistance = null;
+      }
+      if (e.touches.length === 1) {
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    // Hàm tính khoảng cách giữa 2 ngón tay
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Áp dụng scale
+    function applyZoom(factor) {
+      currentScale = Math.min(Math.max(currentScale * factor, MIN_SCALE), MAX_SCALE);
+      modelWrapper.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    }
+
+    // Áp dụng xoay
+    function updateRotation() {
+      modelWrapper.setAttribute('rotation', `${currentRotX} ${currentRotY} 0`);
+    }
+
+    // Nút đặt lại vị trí & kích cỡ ban đầu
+    function resetTransforms() {
+      currentScale = INITIAL_SCALE;
+      currentRotX = 0;
+      currentRotY = 0;
+      modelWrapper.setAttribute('scale', `${INITIAL_SCALE} ${INITIAL_SCALE} ${INITIAL_SCALE}`);
+      modelWrapper.setAttribute('rotation', '0 0 0');
+    }
+  </script>
+</body>
+</html>
